@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiliSkin — Historia Clínica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --rose: #c2185b;
+            --rose-light: #fce4ec;
+            --rose-mid: #f48fb1;
+            --gold: #b8975a;
+            --gold-light: #f5efe0;
+            --ink: #1a1a2e;
+            --slate: #546e7a;
+            --bg: #fdf8f5;
+            --white: #ffffff;
+            --border: #ede0d4;
+            --success: #2e7d32;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+        }
+
+        /* ── SIDEBAR ── */
+        #sidebar {
+            position: fixed; top: 0; left: 0; width: 280px; height: 100vh;
+            background: var(--ink); color: white; display: flex; flex-direction: column;
+            z-index: 100; transition: transform 0.3s ease;
+        }
+        #sidebar.closed { transform: translateX(-280px); }
+        .sidebar-logo {
+            padding: 28px 24px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .sidebar-logo h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 32px; font-weight: 700; color: var(--rose-mid);
+            letter-spacing: -0.5px; margin: 0;
+        }
+        .sidebar-logo p { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.3); margin: 2px 0 0; text-transform: uppercase; }
+
+        .sidebar-stats {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+            background: rgba(255,255,255,0.06); margin: 16px 16px 0;
+            border-radius: 10px; overflow: hidden;
+        }
+        .stat-box { background: rgba(255,255,255,0.04); padding: 12px; text-align: center; }
+        .stat-box .num { font-size: 22px; font-weight: 700; color: var(--rose-mid); }
+        .stat-box .lbl { font-size: 9px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 1px; }
+
+        .sidebar-search-wrap { padding: 16px; }
+        .sidebar-search-wrap input {
+            width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; padding: 9px 14px; color: white; font-size: 13px; outline: none;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .sidebar-search-wrap input::placeholder { color: rgba(255,255,255,0.3); }
+        .sidebar-search-wrap input:focus { border-color: var(--rose-mid); }
+
+        #lista-pacientes { flex: 1; overflow-y: auto; padding: 0 8px 16px; }
+        #lista-pacientes::-webkit-scrollbar { width: 4px; }
+        #lista-pacientes::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+        .paciente-item {
+            padding: 10px 12px; border-radius: 8px; cursor: pointer;
+            transition: background 0.15s; margin-bottom: 2px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .paciente-item:hover { background: rgba(255,255,255,0.06); }
+        .paciente-item.active { background: rgba(194,24,91,0.2); border-left: 3px solid var(--rose-mid); }
+        .paciente-item .pname { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .paciente-item .pci { font-size: 10px; color: rgba(255,255,255,0.3); }
+        .paciente-item .del-btn { 
+            width: 22px; height: 22px; border-radius: 50%; background: transparent;
+            border: none; color: rgba(255,255,255,0.2); cursor: pointer; font-size: 14px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .paciente-item .del-btn:hover { background: rgba(194,24,91,0.4); color: white; }
+
+        .sidebar-bottom { padding: 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .btn-nueva-ficha {
+            width: 100%; background: var(--rose); color: white; border: none;
+            border-radius: 8px; padding: 11px; font-size: 12px; font-weight: 700;
+            letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+            font-family: 'DM Sans', sans-serif; transition: background 0.2s;
+        }
+        .btn-nueva-ficha:hover { background: #ad1457; }
+
+        /* ── MAIN CONTENT ── */
+        #main { margin-left: 280px; transition: margin 0.3s ease; }
+        #main.full { margin-left: 0; }
+
+        /* ── TOP BAR ── */
+        #topbar {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(253,248,245,0.92); backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 32px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .toggle-sidebar {
+            background: none; border: none; cursor: pointer; color: var(--ink);
+            padding: 6px; border-radius: 6px;
+        }
+        .toggle-sidebar:hover { background: var(--rose-light); }
+
+        .topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--ink); }
+        .topbar-title span { color: var(--rose); }
+
+        .topbar-actions { display: flex; gap: 8px; align-items: center; }
+        .btn {
+            padding: 9px 20px; border-radius: 8px; font-size: 12px; font-weight: 700;
+            letter-spacing: 0.5px; text-transform: uppercase; cursor: pointer;
+            font-family: 'DM Sans', sans-serif; border: none; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--rose); color: white; }
+        .btn-primary:hover { background: #ad1457; box-shadow: 0 4px 14px rgba(194,24,91,0.3); }
+        .btn-secondary { background: var(--ink); color: white; }
+        .btn-secondary:hover { background: #2a2a4a; }
+        .btn-ghost { background: white; color: var(--slate); border: 1px solid var(--border); }
+        .btn-ghost:hover { border-color: var(--rose); color: var(--rose); }
+
+        /* ── FORM AREA ── */
+        #form-area { padding: 32px; max-width: 960px; margin: 0 auto; }
+
+        /* Tabs */
+        .tabs-nav {
+            display: flex; gap: 4px; background: white; border-radius: 12px;
+            padding: 5px; border: 1px solid var(--border); margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            flex: 1; min-width: 100px; padding: 9px 12px; border-radius: 8px; border: none;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+            cursor: pointer; font-family: 'DM Sans', sans-serif;
+            background: transparent; color: var(--slate); transition: all 0.2s;
+        }
+        .tab-btn.active { background: var(--rose); color: white; box-shadow: 0 2px 8px rgba(194,24,91,0.25); }
+        .tab-btn:not(.active):hover { background: var(--rose-light); color: var(--rose); }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeIn 0.25s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Sections */
+        .card {
+            background: white; border-radius: 16px; padding: 28px;
+            margin-bottom: 20px; border: 1px solid var(--border);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .card-title {
+            font-size: 10px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--rose); margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .card-title::after {
+            content: ''; flex: 1; height: 1px; background: var(--rose-light);
+        }
+
+        /* Fields */
+        .field-group { display: grid; gap: 18px; }
+        .field { display: flex; flex-direction: column; }
+        .field label, label.field-label {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; color: #9e9e9e; margin-bottom: 5px;
+            display: block;
+        }
+        .field input[type="text"],
+        .field input[type="number"],
+        .field input[type="date"],
+        .field textarea,
+        .field select,
+        input.field-input, textarea.field-textarea, select.field-select {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 9px 12px; font-size: 14px;
+            font-family: 'DM Sans', sans-serif; color: var(--ink);
+            outline: none; transition: border 0.2s, box-shadow 0.2s; width: 100%;
+        }
+        .field input:focus, .field textarea:focus, .field select:focus,
+        input.field-input:focus, textarea.field-textarea:focus {
+            border-color: var(--rose); box-shadow: 0 0 0 3px rgba(194,24,91,0.08);
+            background: white;
+        }
+        .field textarea { resize: vertical; min-height: 90px; }
+
+        /* Checkboxes */
+        .checks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+        .check-item {
+            display: flex; align-items: center; gap: 8px; font-size: 13px;
+            cursor: pointer; padding: 7px 10px; border-radius: 7px;
+            border: 1px solid transparent; transition: all 0.15s; user-select: none;
+        }
+        .check-item:hover { background: var(--rose-light); border-color: var(--rose-mid); }
+        .check-item input[type="checkbox"] { accent-color: var(--rose); width: 15px; height: 15px; flex-shrink: 0; }
+        .check-item.checked { background: var(--rose-light); border-color: var(--rose-mid); font-weight: 600; }
+
+        /* Photo slots */
+        .photo-slot {
+            border: 2px dashed var(--border); border-radius: 12px; height: 220px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            overflow: hidden; position: relative; background: var(--bg); cursor: pointer;
+            transition: all 0.3s;
+        }
+        .photo-slot:hover { border-color: var(--rose); background: var(--rose-light); }
+        .photo-slot img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-slot .ph { pointer-events: none; text-align: center; }
+        .photo-slot .ph svg { margin: 0 auto 8px; display: block; color: #ccc; }
+        .photo-slot .ph span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #bbb; }
+        .photo-remove {
+            position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+            background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%;
+            cursor: pointer; font-size: 16px; display: none; align-items: center; justify-content: center;
+            transition: background 0.15s;
+        }
+        .photo-remove:hover { background: var(--rose); }
+        .photo-slot:hover .photo-remove { display: flex; }
+
+        /* Sesiones */
+        .sesion-card {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+            margin-bottom: 12px; overflow: hidden;
+        }
+        .sesion-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px; cursor: pointer; transition: background 0.15s;
+        }
+        .sesion-header:hover { background: var(--rose-light); }
+        .sesion-header .sesion-date { font-size: 12px; font-weight: 700; color: var(--rose); }
+        .sesion-header .sesion-summary { font-size: 12px; color: var(--slate); margin-top: 2px; }
+        .sesion-header .sesion-num { 
+            font-size: 10px; font-weight: 800; background: var(--rose-light); color: var(--rose);
+            padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .sesion-body { display: none; padding: 18px; border-top: 1px solid var(--border); }
+        .sesion-body.open { display: block; }
+        .sesion-actions { display: flex; gap: 6px; margin-top: 4px; }
+        .btn-sesion-del {
+            padding: 5px 12px; font-size: 10px; font-weight: 700; border: 1px solid #ffcdd2;
+            background: #fff; color: #c62828; border-radius: 6px; cursor: pointer;
+            font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+        }
+        .btn-sesion-del:hover { background: #ffebee; }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            background: var(--ink); color: white; padding: 14px 20px; border-radius: 10px;
+            font-size: 13px; font-weight: 500; display: none; align-items: center; gap: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2); max-width: 300px;
+        }
+        #toast.show { display: flex; animation: slideUp 0.3s ease; }
+        #toast.success .dot { background: #66bb6a; }
+        #toast.error .dot { background: #ef5350; }
+        #toast .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Modal nueva sesión */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200;
+            display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: white; border-radius: 16px; padding: 32px; width: 100%;
+            max-width: 580px; max-height: 85vh; overflow-y: auto;
+        }
+        .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 700; margin-bottom: 20px; color: var(--ink); }
+        .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+
+        /* Badge conteo */
+        .badge { display: inline-block; background: var(--rose); color: white; border-radius: 20px; padding: 1px 8px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 60px 20px; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+        .empty-state h3 { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; color: var(--slate); margin-bottom: 8px; }
+        .empty-state p { font-size: 13px; color: #aaa; max-width: 300px; margin: 0 auto; }
+
+        /* Fototipo visual */
+        .fototipo-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+        .fototipo-btn {
+            width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 800; color: white; transition: all 0.2s; position: relative;
+        }
+        .fototipo-btn.sel { border-color: var(--rose); box-shadow: 0 0 0 3px rgba(194,24,91,0.2); transform: scale(1.1); }
+        .fototipo-btn input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+        /* Print */
+        @media print {
+            #sidebar, #topbar, .no-print, .tabs-nav { display: none !important; }
+            #main { margin-left: 0 !important; }
+            #form-area { padding: 0 !important; }
+            .tab-panel { display: block !important; }
+            .card { box-shadow: none !important; break-inside: avoid; }
+            body { background: white !important; }
+        }
+
+        /* Responsive - Mobile & Tablet */
+        @media (max-width: 900px) {
+            /* Diagnóstico: 3 columnas → 2 columnas en tablet */
+            .piel-3col { grid-template-columns: 1fr 1fr !important; }
+        }
+
+        @media (max-width: 768px) {
+            /* Sidebar: oculto por defecto en móvil, se abre con clase .open */
+            #sidebar { transform: translateX(-280px); }
+            #sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.3); }
+            #main { margin-left: 0; }
+            #form-area { padding: 12px; }
+
+            /* Topbar compacto en móvil */
+            #topbar { padding: 10px 12px; gap: 8px; flex-wrap: nowrap; }
+            .topbar-title { font-size: 15px; white-space: nowrap; }
+            .topbar-actions { gap: 4px; }
+            .topbar-actions .btn { padding: 7px 10px; font-size: 10px; letter-spacing: 0; }
+
+            /* Tabs: scroll horizontal si no caben */
+            .tabs-nav { overflow-x: auto; flex-wrap: nowrap; gap: 3px; padding: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+            .tabs-nav::-webkit-scrollbar { display: none; }
+            .tab-btn { flex: 0 0 auto; min-width: 80px; padding: 8px 10px; font-size: 10px; white-space: nowrap; }
+
+            /* Cards más compactas */
+            .card { padding: 16px 14px; border-radius: 12px; }
+
+            /* Grids de formulario: 1 columna en móvil para evitar solapamientos */
+            .field-group { grid-template-columns: 1fr !important; }
+            .field[style*="span 2"],
+            .field[style*="1 / -1"] { grid-column: 1 / -1 !important; }
+
+            /* Selects y inputs: asegurar que no se sobrepongan */
+            .field select,
+            .field input,
+            .field textarea,
+            select.field-select,
+            input.field-input,
+            textarea.field-textarea {
+                position: relative;
+                z-index: 1;
+                width: 100% !important;
+                max-width: 100% !important;
+                -webkit-appearance: none;
+                appearance: none;
+            }
+
+            /* Checks: 2 columnas en móvil */
+            .checks-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+
+            /* Diagnóstico piel: 1 columna en móvil */
+            .piel-3col { grid-template-columns: 1fr !important; }
+
+            /* Fotos: 1 columna en móvil */
+            .foto-grid { grid-template-columns: 1fr !important; }
+            .photo-slot { height: 180px; }
+
+            /* Paciente header: apilar */
+            #paciente-header .ph-inner { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+            #paciente-header .ph-stats { gap: 16px !important; }
+
+            /* Modal sesión */
+            .modal-box { padding: 20px 16px; max-height: 92vh; }
+            .modal-title { font-size: 20px; }
+            .modal-actions { flex-direction: column-reverse; gap: 8px; }
+            .modal-actions .btn { width: 100%; padding: 12px; text-align: center; }
+
+            /* Toast: ancho completo en móvil */
+            #toast { left: 16px; right: 16px; bottom: 16px; max-width: none; }
+
+            /* Autorización: 1 columna */
+            .autorizacion-grid { grid-template-columns: 1fr !important; }
+
+            /* Consentimiento: firma en columna única */
+            #tab-autorizacion [style*="grid-template-columns:1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            /* Grids de formulario: 1 columna en móvil pequeño */
+            .field-group { grid-template-columns: 1fr !important; }
+            .field[style*="span 2"] { grid-column: 1 / -1 !important; }
+            .checks-grid { grid-template-columns: 1fr 1fr; gap: 3px; }
+            .check-item { font-size: 12px; padding: 6px 8px; }
+            .topbar-title { display: none; }
+            .btn-txt { display: none; }
+            .topbar-actions .btn { padding: 8px 10px; font-size: 16px; }
+
+            /* Fototipo: ajustar tamaño en pantallas muy pequeñas */
+            .fototipo-grid { gap: 6px; }
+            .fototipo-btn { width: 38px; height: 38px; font-size: 10px; }
+        }
+
+        /* Forzar 1 columna en móvil para grids con repeat(auto-fill) inline */
+        @media (max-width: 768px) {
+            [style*="repeat(auto-fill"] {
+                grid-template-columns: 1fr !important;
+            }
+            [style*="1fr 1fr;gap:40px"] {
+                grid-template-columns: 1fr !important;
+                gap: 24px !important;
+            }
+        }
+
+        /* Overlay para cerrar sidebar en móvil */
+        #sidebar-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4); z-index: 99;
+        }
+        #sidebar-overlay.show { display: block; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR OVERLAY (cierra sidebar al tocar fuera en móvil) -->
+<div id="sidebar-overlay" onclick="closeSidebarOverlay()"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+    <div class="sidebar-logo">
+        <h1>LiliSkin</h1>
+        <p>Cosmetología &amp; Estética</p>
+    </div>
+    <div class="sidebar-stats">
+        <div class="stat-box"><div class="num" id="stat-pacientes">0</div><div class="lbl">Pacientes</div></div>
+        <div class="stat-box"><div class="num" id="stat-sesiones">0</div><div class="lbl">Sesiones</div></div>
+    </div>
+    <div class="sidebar-search-wrap">
+        <input type="text" id="buscador" placeholder="🔍  Buscar por nombre o CI..." oninput="filtrarSidebar()">
+    </div>
+    <div id="lista-pacientes"></div>
+    <div class="sidebar-bottom">
+        <button class="btn-nueva-ficha" onclick="nuevaFicha()">+ Nueva Historia Clínica</button>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+    <!-- TOP BAR -->
+    <div id="topbar" class="no-print">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button class="toggle-sidebar" onclick="toggleSidebar()" title="Menú">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <span class="topbar-title"><span>Lili</span>Skin — Historia Clínica</span>
+        </div>
+        <div class="topbar-actions">
+            <button class="btn btn-ghost" onclick="exportarDatos()">⬇ <span class="btn-txt">Exportar</span></button>
+            <button class="btn btn-ghost" onclick="importarDatos()">⬆ <span class="btn-txt">Importar</span></button>
+            <button class="btn btn-secondary" onclick="imprimirPDF()">🖨 <span class="btn-txt">PDF</span></button>
+            <button class="btn btn-primary" onclick="guardar()">💾 <span class="btn-txt">Guardar</span></button>
+            <input type="file" id="import-input" accept=".json" class="hidden" onchange="procesarImport(event)">
+        </div>
+    </div>
+
+    <!-- FORM AREA -->
+    <div id="form-area">
+
+        <!-- Estado vacío inicial -->
+        <div id="empty-state" class="empty-state no-print">
+            <div class="icon">🌸</div>
+            <h3>Bienvenida a LiliSkin</h3>
+            <p>Selecciona un paciente del panel o crea una nueva historia clínica.</p>
+        </div>
+
+        <!-- FORM (oculto hasta que se crea/carga un paciente) -->
+        <div id="form-content" style="display:none;">
+
+            <!-- Indicador de paciente activo -->
+            <div id="paciente-header" class="card no-print" style="background: linear-gradient(135deg, #1a1a2e, #2a1a3e); color: white; margin-bottom: 20px;">
+                <div class="ph-inner" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <div style="font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.4);text-transform:uppercase;margin-bottom:4px;">Paciente activo</div>
+                        <div id="ph-nombre" style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:#f48fb1;"></div>
+                        <div id="ph-ci" style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:2px;"></div>
+                    </div>
+                    <div class="ph-stats" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div id="ph-edad" style="font-size:20px;font-weight:700;color:#f48fb1;"></div>
+                            <div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;">años</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div id="ph-sesiones-count" style="font-size:20px;font-weight:700;color:#f48fb1;">0</div>
+                            <div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;">sesiones</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div id="ph-ultima" style="font-size:13px;font-weight:600;color:#f48fb1;"></div>
+                            <div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;">última visita</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABS -->
+            <div class="tabs-nav no-print">
+                <button class="tab-btn active" onclick="showTab('datos')">Datos</button>
+                <button class="tab-btn" onclick="showTab('antecedentes')">Antecedentes</button>
+                <button class="tab-btn" onclick="showTab('piel')">Diagnóstico</button>
+                <button class="tab-btn" onclick="showTab('sesiones')">Sesiones <span id="badge-sesiones" class="badge">0</span></button>
+                <button class="tab-btn" onclick="showTab('fotos')">Fotos</button>
+                <button class="tab-btn" onclick="showTab('autorizacion')">Autorización</button>
+            </div>
+
+            <form id="hc-form">
+
+                <!-- ── TAB: DATOS ── -->
+                <div id="tab-datos" class="tab-panel active">
+                    <div class="card">
+                        <div class="card-title">I. Datos Informativos</div>
+                        <div class="field-group" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+                            <div class="field" style="grid-column: span 2;">
+                                <label>Nombres *</label>
+                                <input type="text" name="nombres" id="fnombres" class="field-input" oninput="actualizarHeader()" required>
+                            </div>
+                            <div class="field" style="grid-column: span 2;">
+                                <label>Apellidos *</label>
+                                <input type="text" name="apellidos" class="field-input" oninput="actualizarHeader()">
+                            </div>
+                            <div class="field">
+                                <label>Cédula / CI *</label>
+                                <input type="text" name="ci" id="fci" class="field-input" required>
+                            </div>
+                            <div class="field">
+                                <label>Teléfono</label>
+                                <input type="text" name="telefonos" class="field-input">
+                            </div>
+                            <div class="field">
+                                <label>Edad</label>
+                                <input type="number" name="edad" class="field-input" min="0" max="120" oninput="actualizarHeader()">
+                            </div>
+                            <div class="field">
+                                <label>Sexo</label>
+                                <select name="sexo" class="field-select">
+                                    <option value="">—</option>
+                                    <option>Femenino</option>
+                                    <option>Masculino</option>
+                                    <option>Otro</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Fecha Nacimiento</label>
+                                <input type="date" name="fnac" class="field-input">
+                            </div>
+                            <div class="field">
+                                <label>Ocupación</label>
+                                <input type="text" name="ocupacion" class="field-input">
+                            </div>
+                            <div class="field" style="grid-column: 1 / -1;">
+                                <label>Dirección</label>
+                                <input type="text" name="direccion" class="field-input">
+                            </div>
+                            <div class="field">
+                                <label>Email</label>
+                                <input type="text" name="email" class="field-input">
+                            </div>
+                            <div class="field">
+                                <label>Fecha primera consulta</label>
+                                <input type="date" name="fecha_hoy" class="field-input">
+                            </div>
+                            <div class="field">
+                                <label>¿Cómo nos conoció?</label>
+                                <select name="como_conocio" class="field-select">
+                                    <option value="">—</option>
+                                    <option>Redes sociales</option>
+                                    <option>Recomendación</option>
+                                    <option>Búsqueda web</option>
+                                    <option>Publicidad</option>
+                                    <option>Otro</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Motivo de Consulta</label>
+                                <input type="text" name="motivo" class="field-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB: ANTECEDENTES ── -->
+                <div id="tab-antecedentes" class="tab-panel">
+                    <div class="card">
+                        <div class="card-title">II. Antecedentes Personales</div>
+                        <div class="checks-grid">
+                            <label class="check-item"><input type="checkbox" name="h_hiper"> Hipertensión</label>
+                            <label class="check-item"><input type="checkbox" name="h_cardio"> Enf. Cardíacas</label>
+                            <label class="check-item"><input type="checkbox" name="h_diab"> Diabetes</label>
+                            <label class="check-item"><input type="checkbox" name="h_asma"> Asma</label>
+                            <label class="check-item"><input type="checkbox" name="h_herpes"> Herpes</label>
+                            <label class="check-item"><input type="checkbox" name="h_cancer"> Cáncer</label>
+                            <label class="check-item"><input type="checkbox" name="h_epilep"> Epilepsia</label>
+                            <label class="check-item"><input type="checkbox" name="h_derma"> Dermatitis atópica</label>
+                            <label class="check-item"><input type="checkbox" name="h_psoria"> Psoriasis</label>
+                            <label class="check-item"><input type="checkbox" name="h_vitiligo"> Vitiligo</label>
+                            <label class="check-item"><input type="checkbox" name="h_tiroides"> Tiroides</label>
+                            <label class="check-item"><input type="checkbox" name="h_coagul"> Trastornos coagulación</label>
+                            <label class="check-item"><input type="checkbox" name="h_keloid"> Tendencia queloides</label>
+                            <label class="check-item"><input type="checkbox" name="h_implantes"> Implantes faciales</label>
+                        </div>
+                        <div class="field" style="margin-top:16px;">
+                            <label>Fracturas faciales / Cirugías previas / Otras</label>
+                            <input type="text" name="h_otras" class="field-input">
+                        </div>
+                        <div class="field" style="margin-top:12px;">
+                            <label>Medicamentos permanentes</label>
+                            <input type="text" name="r_medicamentos" class="field-input">
+                        </div>
+                        <div class="field" style="margin-top:12px;">
+                            <label>Alergias conocidas</label>
+                            <input type="text" name="r_alergias" class="field-input">
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">Antecedentes Familiares</div>
+                        <div class="checks-grid">
+                            <label class="check-item"><input type="checkbox" name="hf_hiper"> Hipertensión</label>
+                            <label class="check-item"><input type="checkbox" name="hf_diab"> Diabetes</label>
+                            <label class="check-item"><input type="checkbox" name="hf_derma"> Dermatitis atópica</label>
+                            <label class="check-item"><input type="checkbox" name="hf_viti"> Vitíligo</label>
+                            <label class="check-item"><input type="checkbox" name="hf_psor"> Psoriasis</label>
+                            <label class="check-item"><input type="checkbox" name="hf_cancer"> Cáncer</label>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">III. Gineco Obstétricos</div>
+                        <div class="field-group" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+                            <div class="field"><label>Menarquia</label><input type="text" name="g_menarquia" class="field-input"></div>
+                            <div class="field"><label>Inicio Vida Sexual</label><input type="text" name="g_sexual" class="field-input"></div>
+                            <div class="field"><label>Embarazos</label><input type="text" name="g_embarazos" class="field-input"></div>
+                            <div class="field"><label>Abortos</label><input type="text" name="g_abortos" class="field-input"></div>
+                            <div class="field"><label>Partos</label><input type="text" name="g_partos" class="field-input"></div>
+                            <div class="field"><label>Cesáreas</label><input type="text" name="g_cesareas" class="field-input"></div>
+                            <div class="field"><label>Método Anticonceptivo</label><input type="text" name="g_metodo" class="field-input"></div>
+                            <div class="field"><label>FUM (último periodo)</label><input type="text" name="g_fum" class="field-input"></div>
+                            <div class="field"><label>Último Papanicolaou</label><input type="text" name="g_papa" class="field-input"></div>
+                            <div class="field"><label>Fecha Mamografía</label><input type="text" name="g_mamo" class="field-input"></div>
+                        </div>
+                        <div style="margin-top:16px;">
+                            <label class="field-label">Estado actual</label>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;">
+                                <label class="check-item"><input type="checkbox" name="g_embarazo_act"> Embarazada actualmente</label>
+                                <label class="check-item"><input type="checkbox" name="g_lactando"> Lactando</label>
+                                <label class="check-item"><input type="checkbox" name="g_menopausia"> Menopausia</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">IV. Hábitos y Estilo de Vida</div>
+                        <div class="field-group" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+                            <div class="field"><label>Rutina domiciliaria actual</label><input type="text" name="r_rutina" class="field-input"></div>
+                            <div class="field"><label>¿Usa protector solar?</label><select name="r_protector" class="field-select"><option value="">—</option><option>Sí, diario</option><option>Sí, ocasional</option><option>No</option></select></div>
+                            <div class="field"><label>¿Tirantez después del baño?</label><select name="r_tirantez" class="field-select"><option value="">—</option><option>Sí</option><option>No</option><option>A veces</option></select></div>
+                            <div class="field"><label>¿Se descama la piel?</label><select name="r_descama" class="field-select"><option value="">—</option><option>Sí</option><option>No</option><option>A veces</option></select></div>
+                            <div class="field"><label>¿Presenta sensibilidad?</label><select name="r_sensible" class="field-select"><option value="">—</option><option>Sí</option><option>No</option><option>A veces</option></select></div>
+                            <div class="field"><label>Reacción ante cosmético</label><input type="text" name="r_reaccion" class="field-input"></div>
+                            <div class="field"><label>Horas de sueño (prom.)</label><input type="text" name="r_sueno" class="field-input" placeholder="ej: 7 horas"></div>
+                            <div class="field"><label>Nivel de estrés</label><select name="r_estres" class="field-select"><option value="">—</option><option>Bajo</option><option>Moderado</option><option>Alto</option></select></div>
+                            <div class="field"><label>Actividad física</label><select name="r_actividad" class="field-select"><option value="">—</option><option>Sedentario</option><option>Moderado</option><option>Activo</option></select></div>
+                            <div class="field"><label>Ingesta de agua (diaria)</label><input type="text" name="r_agua" class="field-input" placeholder="ej: 2 litros"></div>
+                            <div class="field"><label>¿Fuma?</label><select name="r_fuma" class="field-select"><option value="">—</option><option>No</option><option>Sí</option><option>Ex fumador</option></select></div>
+                            <div class="field"><label>Dieta predominante</label><input type="text" name="r_dieta" class="field-input"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB: DIAGNÓSTICO ── -->
+                <div id="tab-piel" class="tab-panel">
+                    <div class="card">
+                        <div class="card-title">V. Diagnóstico de Piel</div>
+                        <div class="piel-3col" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;">
+                            <div>
+                                <div style="font-size:11px;font-weight:700;color:var(--rose);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Tipo de Cutis</div>
+                                <div style="display:flex;flex-direction:column;gap:4px;">
+                                    <label class="check-item"><input type="checkbox" name="c_normal"> Piel Normal</label>
+                                    <label class="check-item"><input type="checkbox" name="c_seca"> Piel Seca</label>
+                                    <label class="check-item"><input type="checkbox" name="c_mixta"> Piel Mixta</label>
+                                    <label class="check-item"><input type="checkbox" name="c_grasa"> Piel Grasa</label>
+                                    <label class="check-item"><input type="checkbox" name="c_sebo"> Piel Seborreica</label>
+                                    <label class="check-item"><input type="checkbox" name="c_desvi"> Piel Desvitalizada</label>
+                                    <label class="check-item"><input type="checkbox" name="c_deshi"> Piel Deshidratada</label>
+                                    <label class="check-item"><input type="checkbox" name="c_hiperhi"> Piel Hiper Hidratada</label>
+                                    <label class="check-item"><input type="checkbox" name="c_sensi"> Piel Sensible</label>
+                                    <label class="check-item"><input type="checkbox" name="c_madura"> Piel Madura</label>
+                                    <label class="check-item"><input type="checkbox" name="c_acneica"> Piel Acneica</label>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px;font-weight:700;color:var(--rose);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Fototipo Fitzpatrick</div>
+                                <div class="fototipo-grid">
+                                    <label class="fototipo-btn" style="background:#f5e6d3;" title="Tipo I — Muy claro"><input type="checkbox" name="f_1"><span style="color:#555;">I</span></label>
+                                    <label class="fototipo-btn" style="background:#e8c9a0;" title="Tipo II — Claro"><input type="checkbox" name="f_2"><span style="color:#444;">II</span></label>
+                                    <label class="fototipo-btn" style="background:#c9956c;" title="Tipo III — Intermedio"><input type="checkbox" name="f_3">III</label>
+                                    <label class="fototipo-btn" style="background:#a0623a;" title="Tipo IV — Oliva"><input type="checkbox" name="f_4">IV</label>
+                                    <label class="fototipo-btn" style="background:#6a3728;" title="Tipo V — Moreno"><input type="checkbox" name="f_5">V</label>
+                                    <label class="fototipo-btn" style="background:#2c1810;" title="Tipo VI — Negro"><input type="checkbox" name="f_6">VI</label>
+                                </div>
+                                <div style="font-size:11px;font-weight:700;color:var(--rose);text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px;">Textura</div>
+                                <div style="display:flex;flex-direction:column;gap:4px;">
+                                    <label class="check-item"><input type="checkbox" name="t_lisa"> Lisa</label>
+                                    <label class="check-item"><input type="checkbox" name="t_untuosa"> Untuosa</label>
+                                    <label class="check-item"><input type="checkbox" name="t_aspera"> Áspera</label>
+                                    <label class="check-item"><input type="checkbox" name="t_rugosa"> Rugosa</label>
+                                    <label class="check-item"><input type="checkbox" name="t_escamosa"> Escamosa</label>
+                                </div>
+                                <div style="font-size:11px;font-weight:700;color:var(--rose);text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px;">Poros</div>
+                                <div style="display:flex;flex-direction:column;gap:4px;">
+                                    <label class="check-item"><input type="checkbox" name="p_cerrados"> Poros cerrados</label>
+                                    <label class="check-item"><input type="checkbox" name="p_dilatados"> Poros dilatados</label>
+                                    <label class="check-item"><input type="checkbox" name="p_comedones"> Con comedones</label>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:11px;font-weight:700;color:var(--rose);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Lesiones Observadas</div>
+                                <div style="font-size:9px;font-weight:800;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin:6px 0 4px;">Elementales</div>
+                                <div style="display:flex;flex-direction:column;gap:2px;">
+                                    <label class="check-item"><input type="checkbox" name="l_com"> Comedones</label>
+                                    <label class="check-item"><input type="checkbox" name="l_pus"> Pústulas</label>
+                                    <label class="check-item"><input type="checkbox" name="l_ves"> Vesículas</label>
+                                    <label class="check-item"><input type="checkbox" name="l_mac"> Máculas</label>
+                                    <label class="check-item"><input type="checkbox" name="l_pap"> Pápulas</label>
+                                    <label class="check-item"><input type="checkbox" name="l_qui"> Quistes</label>
+                                    <label class="check-item"><input type="checkbox" name="l_cic"> Cicatrices</label>
+                                    <label class="check-item"><input type="checkbox" name="l_arr"> Arrugas</label>
+                                    <label class="check-item"><input type="checkbox" name="l_fla"> Flacidez</label>
+                                    <label class="check-item"><input type="checkbox" name="l_ojeras"> Ojeras</label>
+                                    <label class="check-item"><input type="checkbox" name="l_bolsas"> Bolsas palpebrales</label>
+                                </div>
+                                <div style="font-size:9px;font-weight:800;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;">Pigmentarias / Vasculares</div>
+                                <div style="display:flex;flex-direction:column;gap:2px;">
+                                    <label class="check-item"><input type="checkbox" name="lp_clo"> Cloasma</label>
+                                    <label class="check-item"><input type="checkbox" name="lp_mel"> Melasma</label>
+                                    <label class="check-item"><input type="checkbox" name="lp_viti"> Vitíligo</label>
+                                    <label class="check-item"><input type="checkbox" name="lv_eri"> Eritema</label>
+                                    <label class="check-item"><input type="checkbox" name="lv_tel"> Telangiectasias</label>
+                                    <label class="check-item"><input type="checkbox" name="lv_ros"> Rosácea</label>
+                                    <label class="check-item"><input type="checkbox" name="lv_peca"> Pecas / Léntigos</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">Diagnóstico General del Especialista</div>
+                        <div class="field-group">
+                            <div class="field">
+                                <label>Análisis y diagnóstico general de la piel</label>
+                                <textarea name="t_analisis" class="field-textarea" rows="4" placeholder="Descripción general del estado de la piel, observaciones relevantes..."></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Objetivos del tratamiento</label>
+                                <textarea name="t_objetivos" class="field-textarea" rows="3" placeholder="¿Qué se quiere lograr con el tratamiento?"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB: SESIONES ── -->
+                <div id="tab-sesiones" class="tab-panel">
+                    <div class="card no-print" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                        <div>
+                            <div style="font-size:14px;font-weight:600;">Historial de Sesiones</div>
+                            <div style="font-size:12px;color:var(--slate);margin-top:2px;">Registra cada visita con su protocolo y evolución.</div>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="abrirModalSesion()">+ Nueva Sesión</button>
+                    </div>
+                    <div id="lista-sesiones"></div>
+                </div>
+
+                <!-- ── TAB: FOTOS ── -->
+                <div id="tab-fotos" class="tab-panel">
+                    <div class="card">
+                        <div class="card-title">Galería de Seguimiento</div>
+                        <div class="foto-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                            <div>
+                                <label class="field-label" style="margin-bottom:8px;">Imagen Antes del Tratamiento</label>
+                                <div class="photo-slot" onclick="document.getElementById('img_antes_input').click()">
+                                    <div id="placeholder_antes" class="ph">
+                                        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                        <span>Subir Foto Antes</span>
+                                    </div>
+                                    <img id="preview_antes" class="hidden" style="width:100%;height:100%;object-fit:cover;">
+                                    <button type="button" class="photo-remove" onclick="removerFoto(event,'preview_antes','placeholder_antes','img_antes_data')">✕</button>
+                                    <input type="file" id="img_antes_input" class="hidden" accept="image/*" onchange="previewImage(this,'preview_antes','placeholder_antes','img_antes_data')">
+                                    <input type="hidden" name="img_antes_data" id="img_antes_data">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="field-label" style="margin-bottom:8px;">Imagen Después del Tratamiento</label>
+                                <div class="photo-slot" onclick="document.getElementById('img_despues_input').click()">
+                                    <div id="placeholder_despues" class="ph">
+                                        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                        <span>Subir Foto Después</span>
+                                    </div>
+                                    <img id="preview_despues" class="hidden" style="width:100%;height:100%;object-fit:cover;">
+                                    <button type="button" class="photo-remove" onclick="removerFoto(event,'preview_despues','placeholder_despues','img_despues_data')">✕</button>
+                                    <input type="file" id="img_despues_input" class="hidden" accept="image/*" onchange="previewImage(this,'preview_despues','placeholder_despues','img_despues_data')">
+                                    <input type="hidden" name="img_despues_data" id="img_despues_data">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field" style="margin-top:16px;">
+                            <label>Notas sobre las fotos / Observaciones visuales</label>
+                            <textarea name="notas_fotos" class="field-textarea" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB: AUTORIZACIÓN ── -->
+                <div id="tab-autorizacion" class="tab-panel">
+                    <div class="card">
+                        <div class="card-title">Consentimiento Informado</div>
+                        <div style="background:var(--gold-light);border-left:4px solid var(--gold);border-radius:8px;padding:18px 20px;margin-bottom:24px;">
+                            <p style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#5d4037;line-height:1.7;font-style:italic;">
+                                "Libero de toda responsabilidad que se presente por causa de la naturaleza de la piel y ajenos al tratamiento. Certifico que he leído y entiendo claramente la explicación sobre el tratamiento y la responsabilidad que tengo para el éxito de este."
+                            </p>
+                        </div>
+                        <div class="autorizacion-grid field-group" style="grid-template-columns:1fr 1fr;gap:24px;">
+                            <div class="field">
+                                <label>Nombre completo del paciente</label>
+                                <input type="text" name="firma_paciente_nombre" class="field-input">
+                            </div>
+                            <div class="field">
+                                <label>Fecha de consentimiento</label>
+                                <input type="date" name="firma_fecha" class="field-input">
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:48px;">
+                            <div style="border-top:1px solid #ccc;padding-top:12px;text-align:center;">
+                                <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;">Firma del Paciente</p>
+                            </div>
+                            <div style="border-top:2px solid var(--rose);padding-top:12px;text-align:center;">
+                                <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--rose);">LiliSkin — Especialista</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Notas Adicionales</div>
+                        <div class="field">
+                            <label>Observaciones generales / notas privadas</label>
+                            <textarea name="notas_adicionales" class="field-textarea" rows="5" placeholder="Notas internas, recordatorios, observaciones especiales..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL NUEVA SESIÓN -->
+<div class="modal-overlay" id="modal-sesion">
+    <div class="modal-box">
+        <div class="modal-title">📋 Registrar Sesión</div>
+        <input type="hidden" id="sesion-edit-idx" value="">
+        <div class="field-group">
+            <div class="field">
+                <label>Fecha de la sesión *</label>
+                <input type="date" id="s_fecha" class="field-input">
+            </div>
+            <div class="field">
+                <label>Número / Nombre de sesión</label>
+                <input type="text" id="s_nombre" class="field-input" placeholder="ej: Sesión 1 — Hidratación profunda">
+            </div>
+            <div class="field">
+                <label>Protocolo de cabina utilizado</label>
+                <textarea id="s_protocolo" class="field-textarea" rows="3" placeholder="Técnicas, equipos, productos aplicados..."></textarea>
+            </div>
+            <div class="field">
+                <label>Productos utilizados</label>
+                <input type="text" id="s_productos" class="field-input" placeholder="Marcas, activos, concentraciones...">
+            </div>
+            <div class="field">
+                <label>Reacción / Tolerancia del paciente</label>
+                <select id="s_reaccion" class="field-select">
+                    <option value="">—</option>
+                    <option>Excelente tolerancia</option>
+                    <option>Buena tolerancia</option>
+                    <option>Tolerancia moderada</option>
+                    <option>Sensibilidad leve</option>
+                    <option>Reacción adversa</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Evolución observada</label>
+                <textarea id="s_evolucion" class="field-textarea" rows="3" placeholder="Cambios observados, mejoras, comparación con sesión anterior..."></textarea>
+            </div>
+            <div class="field">
+                <label>Indicaciones para casa</label>
+                <textarea id="s_indicaciones" class="field-textarea" rows="3" placeholder="Cuidados post-tratamiento, productos recomendados..."></textarea>
+            </div>
+            <div class="field">
+                <label>Próxima cita sugerida</label>
+                <input type="date" id="s_proxima" class="field-input">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" onclick="cerrarModalSesion()">Cancelar</button>
+            <button type="button" class="btn btn-primary" onclick="guardarSesion()">Guardar Sesión</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"><span class="dot"></span><span id="toast-msg"></span></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────
+let db = JSON.parse(localStorage.getItem('liliskin_v2_db')) || {};
+let currentCI = null;
+let sidebarOpen = true;
+
+function saveDB() { localStorage.setItem('liliskin_v2_db', JSON.stringify(db)); }
+
+function getP(ci) { return db[ci] || null; }
+
+function stats() {
+    const ps = Object.keys(db).length;
+    let total = 0;
+    Object.values(db).forEach(p => { total += (p.sesiones || []).length; });
+    document.getElementById('stat-pacientes').textContent = ps;
+    document.getElementById('stat-sesiones').textContent = total;
+}
+
+// ─────────────────────────────────────────────
+//  SIDEBAR
+// ─────────────────────────────────────────────
+function toggleSidebar() {
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+        const isOpen = document.getElementById('sidebar').classList.contains('open');
+        document.getElementById('sidebar').classList.toggle('open', !isOpen);
+        document.getElementById('sidebar-overlay').classList.toggle('show', !isOpen);
+    } else {
+        sidebarOpen = !sidebarOpen;
+        document.getElementById('sidebar').classList.toggle('closed', !sidebarOpen);
+        document.getElementById('main').classList.toggle('full', !sidebarOpen);
+    }
+}
+
+function closeSidebarOverlay() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+function renderSidebar(filtro = '') {
+    const container = document.getElementById('lista-pacientes');
+    container.innerHTML = '';
+    const lista = Object.values(db).filter(p => {
+        const q = (filtro || '').toLowerCase();
+        return !q || (p.nombres + ' ' + (p.apellidos || '')).toLowerCase().includes(q) || (p.ci || '').includes(q);
+    }).sort((a, b) => (a.nombres || '').localeCompare(b.nombres || ''));
+
+    if (!lista.length) {
+        container.innerHTML = '<p style="font-size:11px;color:rgba(255,255,255,0.25);text-align:center;padding:20px;">Sin resultados</p>';
+        stats();
+        return;
+    }
+    lista.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'paciente-item' + (p.ci === currentCI ? ' active' : '');
+
+        const nameDiv = document.createElement('div');
+        nameDiv.style.cssText = 'flex:1;min-width:0;cursor:pointer;';
+        nameDiv.onclick = () => cargarPaciente(p.ci);
+
+        const pname = document.createElement('div');
+        pname.className = 'pname';
+        pname.textContent = (p.nombres || '') + ' ' + (p.apellidos || '');
+
+        const pci = document.createElement('div');
+        pci.className = 'pci';
+        pci.textContent = 'CI: ' + p.ci + ' · ' + (p.sesiones || []).length + ' ses.';
+
+        nameDiv.appendChild(pname);
+        nameDiv.appendChild(pci);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'del-btn';
+        delBtn.title = 'Eliminar';
+        delBtn.textContent = '×';
+        delBtn.onclick = (e) => eliminarPaciente(e, p.ci);
+
+        item.appendChild(nameDiv);
+        item.appendChild(delBtn);
+        container.appendChild(item);
+    });
+    stats();
+}
+
+function filtrarSidebar() {
+    renderSidebar(document.getElementById('buscador').value);
+}
+
+function eliminarPaciente(e, ci) {
+    e.stopPropagation();
+    const p = db[ci];
+    if (!p) return;
+    if (!confirm(`¿Eliminar a ${p.nombres} ${p.apellidos || ''}? Esta acción no se puede deshacer.`)) return;
+    delete db[ci];
+    saveDB();
+    if (currentCI === ci) { currentCI = null; mostrarEmptyState(); }
+    renderSidebar();
+    toast('Paciente eliminado', 'success');
+}
+
+// ─────────────────────────────────────────────
+//  FORM
+// ─────────────────────────────────────────────
+function mostrarEmptyState() {
+    document.getElementById('empty-state').style.display = 'block';
+    document.getElementById('form-content').style.display = 'none';
+}
+
+function mostrarForm() {
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('form-content').style.display = 'block';
+}
+
+function nuevaFicha() {
+    currentCI = null;
+    formReset();
+    mostrarForm();
+    showTab('datos');
+    renderSidebar();
+    // Fecha de consulta por defecto: hoy
+    const fechaHoy = document.querySelector('[name="fecha_hoy"]');
+    if (fechaHoy) fechaHoy.value = new Date().toISOString().split('T')[0];
+    // Cerrar sidebar en móvil
+    if (window.innerWidth < 768) {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('show');
+    }
+    document.getElementById('fnombres').focus();
+}
+
+function cargarPaciente(ci) {
+    currentCI = ci;
+    const p = db[ci];
+    if (!p) return;
+    formReset();
+    mostrarForm();
+
+    const form = document.getElementById('hc-form');
+
+    // Primero los inputs de texto/select/date
+    Object.keys(p).forEach(k => {
+        if (k === 'sesiones' || typeof p[k] === 'boolean') return;
+        const el = form.elements[k];
+        if (el && el.type !== 'checkbox') el.value = p[k] || '';
+    });
+
+    // Luego los checkboxes por nombre individual
+    form.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        if (p.hasOwnProperty(cb.name)) {
+            cb.checked = !!p[cb.name];
+            // Actualizar estilo check-item
+            const label = cb.closest('.check-item');
+            if (label) label.classList.toggle('checked', cb.checked);
+        }
+    });
+
+    // Sincronizar fototipo visual
+    document.querySelectorAll('.fototipo-btn').forEach(btn => {
+        const cb = btn.querySelector('input[type="checkbox"]');
+        if (cb) btn.classList.toggle('sel', cb.checked);
+    });
+
+    // Fotos
+    if (p.img_antes_data) {
+        document.getElementById('preview_antes').src = p.img_antes_data;
+        document.getElementById('preview_antes').classList.remove('hidden');
+        document.getElementById('placeholder_antes').style.display = 'none';
+        document.getElementById('img_antes_data').value = p.img_antes_data;
+    }
+    if (p.img_despues_data) {
+        document.getElementById('preview_despues').src = p.img_despues_data;
+        document.getElementById('preview_despues').classList.remove('hidden');
+        document.getElementById('placeholder_despues').style.display = 'none';
+        document.getElementById('img_despues_data').value = p.img_despues_data;
+    }
+
+    actualizarHeader();
+    renderSesiones(p.sesiones || []);
+    renderSidebar(document.getElementById('buscador').value);
+
+    // Scroll al inicio - compatible con todos los dispositivos
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Cerrar sidebar en móvil al seleccionar paciente
+    if (window.innerWidth < 768) {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('show');
+    }
+}
+
+function actualizarHeader() {
+    const nombres = document.getElementById('fnombres')?.value || '';
+    const apellidos = document.querySelector('[name="apellidos"]')?.value || '';
+    const edad = document.querySelector('[name="edad"]')?.value || '';
+    const ci = document.getElementById('fci')?.value || '';
+    document.getElementById('ph-nombre').textContent = nombres + (apellidos ? ' ' + apellidos : '');
+    document.getElementById('ph-edad').textContent = edad;
+    document.getElementById('ph-ci').textContent = ci ? 'CI: ' + ci : '';
+    if (currentCI && db[currentCI]) {
+        const ses = db[currentCI].sesiones || [];
+        document.getElementById('ph-sesiones-count').textContent = ses.length;
+        const ultima = ses.length ? ses[ses.length - 1] : null;
+        document.getElementById('ph-ultima').textContent = ultima ? formatDate(ultima.fecha) : '—';
+    } else {
+        document.getElementById('ph-sesiones-count').textContent = '0';
+        document.getElementById('ph-ultima').textContent = '—';
+    }
+}
+
+function guardar() {
+    const form = document.getElementById('hc-form');
+    const ci = document.getElementById('fci').value.trim();
+    const nombres = document.getElementById('fnombres').value.trim();
+    if (!ci || !nombres) { toast('CI y Nombre son obligatorios', 'error'); return; }
+
+    const data = {};
+    new FormData(form).forEach((v, k) => { data[k] = v; });
+    form.querySelectorAll('input[type="checkbox"]').forEach(c => { data[c.name] = c.checked; });
+
+    // Preservar sesiones: primero buscar en el CI actual (antes de cambiar), luego en el nuevo
+    const sesionesExistentes =
+        (currentCI && db[currentCI] && db[currentCI].sesiones) ? db[currentCI].sesiones :
+        (db[ci] && db[ci].sesiones) ? db[ci].sesiones : [];
+    data.sesiones = sesionesExistentes;
+
+    // Si el CI cambió, eliminar el registro con CI viejo
+    if (currentCI && currentCI !== ci && db[currentCI]) {
+        delete db[currentCI];
+    }
+
+    currentCI = ci;
+    db[ci] = data;
+    saveDB();
+    actualizarHeader();
+    renderSidebar(document.getElementById('buscador').value);
+    toast('Historia clínica guardada ✓', 'success');
+}
+
+function formReset() {
+    document.getElementById('hc-form').reset();
+    // Fotos
+    document.getElementById('preview_antes').classList.add('hidden');
+    document.getElementById('preview_antes').src = '';
+    document.getElementById('placeholder_antes').style.display = '';
+    document.getElementById('preview_despues').classList.add('hidden');
+    document.getElementById('preview_despues').src = '';
+    document.getElementById('placeholder_despues').style.display = '';
+    document.getElementById('img_antes_data').value = '';
+    document.getElementById('img_despues_data').value = '';
+    // Header
+    document.getElementById('ph-nombre').textContent = '';
+    document.getElementById('ph-edad').textContent = '';
+    document.getElementById('ph-ci').textContent = '';
+    document.getElementById('ph-sesiones-count').textContent = '0';
+    document.getElementById('ph-ultima').textContent = '—';
+    // Limpiar estilos visuales de checkboxes
+    document.querySelectorAll('.check-item').forEach(l => l.classList.remove('checked'));
+    // Limpiar fototipo visual
+    document.querySelectorAll('.fototipo-btn').forEach(b => b.classList.remove('sel'));
+    renderSesiones([]);
+}
+
+// ─────────────────────────────────────────────
+//  TABS
+// ─────────────────────────────────────────────
+function showTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const panel = document.getElementById('tab-' + name);
+    if (panel) panel.classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        if ((b.getAttribute('onclick') || '').includes("'" + name + "'")) b.classList.add('active');
+    });
+}
+
+// ─────────────────────────────────────────────
+//  SESIONES
+// ─────────────────────────────────────────────
+function abrirModalSesion(idx = null) {
+    document.getElementById('sesion-edit-idx').value = idx !== null ? idx : '';
+    document.getElementById('s_fecha').value = new Date().toISOString().split('T')[0];
+    if (idx !== null && currentCI && db[currentCI] && db[currentCI].sesiones && db[currentCI].sesiones[idx]) {
+        const s = db[currentCI].sesiones[idx];
+        document.getElementById('s_fecha').value = s.fecha || '';
+        document.getElementById('s_nombre').value = s.nombre || '';
+        document.getElementById('s_protocolo').value = s.protocolo || '';
+        document.getElementById('s_productos').value = s.productos || '';
+        document.getElementById('s_reaccion').value = s.reaccion || '';
+        document.getElementById('s_evolucion').value = s.evolucion || '';
+        document.getElementById('s_indicaciones').value = s.indicaciones || '';
+        document.getElementById('s_proxima').value = s.proxima || '';
+    } else {
+        ['s_nombre','s_protocolo','s_productos','s_evolucion','s_indicaciones','s_proxima'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('s_reaccion').value = '';
+        const count = (currentCI && db[currentCI] && db[currentCI].sesiones) ? db[currentCI].sesiones.length + 1 : 1;
+        document.getElementById('s_nombre').value = 'Sesión ' + count;
+    }
+    document.getElementById('modal-sesion').classList.add('open');
+}
+
+function cerrarModalSesion() {
+    document.getElementById('modal-sesion').classList.remove('open');
+}
+
+function guardarSesion() {
+    if (!currentCI || !db[currentCI]) {
+        toast('Primero guarda la historia clínica del paciente', 'error');
+        return;
+    }
+    const fecha = document.getElementById('s_fecha').value;
+    if (!fecha) { toast('La fecha es obligatoria', 'error'); return; }
+
+    const sesion = {
+        fecha,
+        nombre: document.getElementById('s_nombre').value,
+        protocolo: document.getElementById('s_protocolo').value,
+        productos: document.getElementById('s_productos').value,
+        reaccion: document.getElementById('s_reaccion').value,
+        evolucion: document.getElementById('s_evolucion').value,
+        indicaciones: document.getElementById('s_indicaciones').value,
+        proxima: document.getElementById('s_proxima').value,
+    };
+
+    if (!db[currentCI].sesiones) db[currentCI].sesiones = [];
+    const idx = document.getElementById('sesion-edit-idx').value;
+    if (idx !== '') {
+        db[currentCI].sesiones[parseInt(idx)] = sesion;
+    } else {
+        db[currentCI].sesiones.push(sesion);
+    }
+    saveDB();
+    renderSesiones(db[currentCI].sesiones);
+    actualizarHeader();
+    cerrarModalSesion();
+    stats();
+    toast('Sesión guardada ✓', 'success');
+}
+
+function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderSesiones(sesiones) {
+    const container = document.getElementById('lista-sesiones');
+    document.getElementById('badge-sesiones').textContent = sesiones.length;
+    document.getElementById('ph-sesiones-count').textContent = sesiones.length;
+    if (!sesiones.length) {
+        container.innerHTML = `<div class="empty-state" style="padding:40px 20px;"><div class="icon">📋</div><h3>Sin sesiones registradas</h3><p>Haz clic en "+ Nueva Sesión" para registrar la primera visita.</p></div>`;
+        return;
+    }
+    container.innerHTML = '';
+    [...sesiones].reverse().forEach((s, revIdx) => {
+        const idx = sesiones.length - 1 - revIdx;
+        const div = document.createElement('div');
+        div.className = 'sesion-card';
+        const campo = (lbl, val) => val ? `<div style="margin-bottom:12px;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:4px;">${lbl}</div><div style="font-size:13px;white-space:pre-wrap;">${esc(val)}</div></div>` : '';
+        div.innerHTML = `
+            <div class="sesion-header" onclick="toggleSesion(this)">
+                <div>
+                    <div class="sesion-date">${esc(formatDate(s.fecha))}</div>
+                    <div class="sesion-summary">${esc(s.nombre || 'Sesión sin nombre')}${s.reaccion ? ' · ' + esc(s.reaccion) : ''}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="sesion-num">Sesión #${idx + 1}</span>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+            </div>
+            <div class="sesion-body">
+                ${campo('Protocolo', s.protocolo)}
+                ${campo('Productos', s.productos)}
+                ${campo('Reacción / Tolerancia', s.reaccion)}
+                ${campo('Evolución', s.evolucion)}
+                ${campo('Indicaciones para casa', s.indicaciones)}
+                ${s.proxima ? campo('Próxima cita', formatDate(s.proxima)) : ''}
+                <div class="sesion-actions">
+                    <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 14px;" onclick="abrirModalSesion(${idx})">✏ Editar</button>
+                    <button type="button" class="btn-sesion-del" onclick="eliminarSesion(${idx})">Eliminar</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function toggleSesion(header) {
+    const body = header.nextElementSibling;
+    body.classList.toggle('open');
+}
+
+function eliminarSesion(idx) {
+    if (!currentCI || !db[currentCI]) return;
+    if (!confirm('¿Eliminar esta sesión?')) return;
+    db[currentCI].sesiones.splice(idx, 1);
+    saveDB();
+    renderSesiones(db[currentCI].sesiones);
+    actualizarHeader();
+    stats();
+    toast('Sesión eliminada', 'success');
+}
+
+// ─────────────────────────────────────────────
+//  FOTOS
+// ─────────────────────────────────────────────
+function previewImage(input, previewId, placeholderId, hiddenId) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById(previewId).src = e.target.result;
+        document.getElementById(previewId).classList.remove('hidden');
+        document.getElementById(placeholderId).style.display = 'none';
+        document.getElementById(hiddenId).value = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removerFoto(e, previewId, placeholderId, hiddenId) {
+    e.stopPropagation();
+    document.getElementById(previewId).classList.add('hidden');
+    document.getElementById(previewId).src = '';
+    document.getElementById(placeholderId).style.display = '';
+    document.getElementById(hiddenId).value = '';
+}
+
+// ─────────────────────────────────────────────
+//  EXPORT / IMPORT
+// ─────────────────────────────────────────────
+function exportarDatos() {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `liliskin_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    toast('Datos exportados ✓', 'success');
+}
+
+function importarDatos() {
+    document.getElementById('import-input').click();
+}
+
+function procesarImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        try {
+            let data = JSON.parse(ev.target.result);
+            // Soportar formato antiguo (array)
+            if (Array.isArray(data)) {
+                const obj = {};
+                data.forEach(p => { if (p && p.ci) obj[p.ci] = p; });
+                data = obj;
+            }
+            if (typeof data !== 'object' || data === null) throw new Error('Formato inválido');
+            const count = Object.keys(data).length;
+            if (confirm(`Importar ${count} paciente(s)? Los datos existentes se combinarán.`)) {
+                db = { ...db, ...data };
+                saveDB();
+                renderSidebar();
+                stats();
+                toast(`${count} paciente(s) importados ✓`, 'success');
+            }
+        } catch(err) { toast('Archivo inválido: ' + err.message, 'error'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+}
+
+// ─────────────────────────────────────────────
+//  PDF
+// ─────────────────────────────────────────────
+function imprimirPDF() {
+    if (!currentCI) { toast('Carga un paciente primero', 'error'); return; }
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('active'));
+    const nombre = (db[currentCI]?.nombres || 'paciente').replace(/\s+/g, '_');
+    const opt = {
+        margin: 10,
+        filename: `HC_LiliSkin_${nombre}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    const restoreTabs = () => {
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        showTab('datos');
+    };
+    html2pdf().set(opt).from(document.getElementById('hc-form')).save()
+        .then(() => { restoreTabs(); toast('PDF generado ✓', 'success'); })
+        .catch(() => { restoreTabs(); toast('Error al generar el PDF', 'error'); });
+}
+
+// ─────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────
+function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    try {
+        const [y, m, d] = dateStr.split('-');
+        const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        return `${parseInt(d)} ${meses[parseInt(m)-1]} ${y}`;
+    } catch { return dateStr; }
+}
+
+let toastTimer;
+function toast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    t.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+window.onload = () => {
+    renderSidebar();
+    stats();
+
+    // Checkboxes interactivos
+    document.querySelectorAll('.check-item').forEach(label => {
+        const cb = label.querySelector('input[type="checkbox"]');
+        if (cb) {
+            const update = () => label.classList.toggle('checked', cb.checked);
+            cb.addEventListener('change', update);
+        }
+    });
+
+    // Fototipo visual
+    document.querySelectorAll('.fototipo-btn').forEach(btn => {
+        const cb = btn.querySelector('input[type="checkbox"]');
+        if (cb) {
+            cb.addEventListener('change', () => btn.classList.toggle('sel', cb.checked));
+        }
+    });
+
+    // Cerrar modal al hacer click fuera
+    document.getElementById('modal-sesion').addEventListener('click', e => {
+        if (e.target === document.getElementById('modal-sesion')) cerrarModalSesion();
+    });
+
+    // Mobile: sidebar cerrado por defecto (en móvil no se usa sidebarOpen sino clase .open)
+    if (window.innerWidth < 768) {
+        sidebarOpen = false;
+        // En móvil el sidebar ya está oculto por CSS (transform), no necesita clase extra
+        document.getElementById('main').classList.add('full');
+    }
+};
+</script>
+</body>
+</html>
